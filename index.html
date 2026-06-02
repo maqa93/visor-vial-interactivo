@@ -112,23 +112,23 @@
             attribution: 'Tiles &copy; Esri'
         });
 
-        // 3. Estilos Base Estáticos (EDITA AQUÍ COLORES Y GROSORES GENERALES)
+        // 3. Estilos Base Estáticos
         const estiloPerimetro = { color: "#000000", weight: 3.5, fillOpacity: 0.02, dashArray: "5, 5" }; 
         const estiloRVN = { color: "#dc2626", weight: 2.5, opacity: 0.85 }; 
         const estiloCovirsur = { color: "#8b5cf6", weight: 8, opacity: 0.4, fillOpacity: 0.2 }; 
 
-        // 4. Estilo Dinámico para Ejes Priorizados según ID (EDITA AQUÍ COLORES DE EJES)
+        // 4. Estilo Dinámico para Ejes Priorizados según ID
         function obtenerEstiloEjes(feature) {
             let id = feature.properties.id;
             let colorEje = "#6b7280"; 
             
-            if (id == 1) colorEje = "#4ade80";      // ID 1: Verde claro
-            else if (id == 2) colorEje = "#fb923c"; // ID 2: Naranja claro
-            else if (id == 3) colorEje = "#60a5fa"; // ID 3: Azul claro
+            if (id == 1) { colorEje = "#4ade80"; }
+            else if (id == 2) { colorEje = "#fb923c"; }
+            else if (id == 3) { colorEje = "#60a5fa"; }
 
             return {
                 color: colorEje,
-                weight: 12, // Grosor de las líneas de los ejes
+                weight: 12,
                 opacity: 0.9
             };
         }
@@ -146,6 +146,10 @@
             contenido += "</div>";
             layer.bindPopup(contenido);
         }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            // Código aislado de inicialización si fuera necesario
+        });
 
         function opcionesConcesion(feature, layer) {
             if (feature.properties && feature.properties.ADM_VALIDO) {
@@ -192,7 +196,7 @@
                 })
                 .then(data => {
                     capa.addData(data);
-                    if(capa === capaPerimetro) { map.fitBounds(capa.getBounds()); }
+                    if (capa === capaPerimetro) { map.fitBounds(capa.getBounds()); }
                 })
                 .catch(err => console.error("Error cargando capa:", err));
         }
@@ -207,12 +211,12 @@
         capaCovirsur.addTo(map);
         capaEjes.addTo(map);
 
-        // 8. Panel de Control de Capas Superior Derecho (EDITA AQUÍ LOS NOMBRES QUE SE MUESTRAN)
+        // 8. Panel de Control de Capas Superior Derecho
         const mapasBase = {
             "Mapa Claro Gris (Carto)": mapaClaro,
             "OpenStreetMap (Calles)": osmEstandar,
             "Google Maps (Calles)": googleCalles,
-            "Vista Satelital (Esri)": satelitalEsri
+            "Vista Satelital (Esri)": satelital
         };
 
         const capasSuperpuestas = {
@@ -235,9 +239,9 @@
                 <i style="background: #dc2626; height: 3px; margin-top: 9px;"></i> Red Vial Nacional<br>
                 <i style="background: #8b5cf6; opacity: 0.4;"></i> Concesión COVISUR<br>
                 <h4 style="margin-top: 10px; border-bottom: none; font-size: 11px;">Ejes Prioritarios:</h4>
-                <i style="background: #4ade80; height: 5px; margin-top: 8px;"></i> Independencia-Mariano Núñez <br>
-                <i style="background: #fb923c; height: 5px; margin-top: 8px;"></i> Huancané-Jr. San Martín <br>
-                <i style="background: #60a5fa; height: 5px; margin-top: 8px;"></i> Circunvalación <br>
+                <i style="background: #4ade80; height: 5px; margin-top: 8px;"></i> Independencia-Mariano Núñez<br>
+                <i style="background: #fb923c; height: 5px; margin-top: 8px;"></i> Huancané-Jr. San Martín<br>
+                <i style="background: #60a5fa; height: 5px; margin-top: 8px;"></i> Circunvalación<br>
             `;
             return div;
         };
