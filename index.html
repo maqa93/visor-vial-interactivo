@@ -42,7 +42,7 @@
 
     <div class="info-panel">
         <h1>Visor PMUS Juliaca</h1>
-        <p>Plan de Movilidad Urbana Sostenible: Diagnóstico de Ejes, Concesiones, Manzanas y Perímetro de Intervención.</p>
+        <p>Plan de Movilidad Urbana Sostenible: Ejes Priorizados, Red Vial Nacional y Concesiones.</p>
     </div>
 
     <div id="map"></div>
@@ -68,16 +68,71 @@
             attribution: 'Tiles &copy; Esri'
         });
 
-        // 3. Estilos visuales personalizados para las 5 capas
-        const estiloPerimetro = { color: "#2563eb", weight: 3, fillOpacity: 0.04, dashArray: "6, 6" };
-        const estiloManzanas = { color: "#9ca3af", weight: 0.6, fillOpacity: 0.25, fillColor: "#d1d5db" };
-        const estiloRVN = { color: "#6b7280", weight: 2, opacity: 0.7 };
-        const estiloCovirsur = { color: "#f59e0b", weight: 3.5, opacity: 0.85 }; // Naranja para la concesión
-        const estiloEjesPriorizados = { color: "#dc2626", weight: 5, opacity: 0.9 }; // Rojo grueso destacado
+        // 3. Estilos Base Estáticos
+        const estiloPerimetro = { color: "#000000", weight: 3, fillOpacity: 0.02, dashArray: "5, 5" }; // Negro
+        const estiloRVN = { color: "#dc2626", weight: 2.5, opacity: 0.85 }; // Rojo
+        const estiloCovirsur = { color: "#8b5cf6", weight: 4, opacity: 0.4, fillOpacity: 0.2 }; // Morado claro con transparencia
 
-        // 4. Función para crear Popups legibles con los atributos de QGIS
-        function configurarPopup(feature, layer) {
-            let contenido = "<div style='font-size:12px; line-height: 1.5; max-height: 200px; overflow-y: auto;'>";
+        // 4. Estilo Dinámico para Ejes Priorizados según ID
+        function obtenerEstiloEjes(feature) {
+            let id = feature.properties.id;
+            let colorEje = "#6b7280"; // Color gris por defecto si no coincide el ID
+            
+            if (id == 1) colorEje = "#4ade80";      // Verde claro
+            else if (id == 2) colorEje = "#fb923c"; // Naranja claro
+            else if (id == 3) colorEje = "#60a5fa"; // Azul claro
+
+            return {
+                color: colorEje,
+                weight: 6, // Grosor resaltado para los ejes
+                opacity: 0.9
+            };
+        }
+
+        // 5. Lógica de Interacción (Hover y Popups específicos)
+        
+        // Configuración para los Ejes Priorizados
+        function opcionesEjes(feature, layer) {
+            // Mostrar nombre del eje al pasar el mouse por encima (Tooltip)
+            if (feature.properties && feature.properties.nomb_eje) {
+                layer.bindTooltip(feature.properties.nomb_eje, { sticky: true, className: 'label-eje' });
+            }
+            
+            // Popup clásico al hacer clic con toda la info de la tabla de atributos
+            let contenido = "<div style='font-size:12px; line-height: 1.5;'>";
+            for (let clave in feature.properties) {
+                let valor = feature.properties[clave] !== null ? feature.properties[clave] : '-';
+                contenido += `<strong>${clave}:</strong> ${valor}<br/>`;
+            }
+            contenido += "</div>";
+            layer.bindPopup(contenido);
+        }
+
+        // Configuración para la Concesión (COVIRSUR)
+        function opcionesConcesion(feature, layer) {
+            // Mostrar "Concesionaria: [valor]" al pasar el mouse por encima
+            if (feature.properties && feature.properties.ADM_VALIDO) {
+                let textoHover = `<strong>Concesionaria:</strong> ${feature.properties.ADM_VALIDO}`;
+                layer.bindTooltip(textoHover, { sticky: true, html: true });
+            }
+
+            // Popup al hacer clic
+            let contenido = "<div style='font-size:12px; line-height: 1.5;'>";
+            for (let clave in feature.properties) {
+                let valor = feature.properties[clave] !== null ? feature.properties[clave] : '-';
+                if (clave === 'ADM_VALIDO') {
+                    contenido += `<strong>Concesionaria:</strong> ${valor}<br/>`;
+                } else {
+                    contenido += `<strong>${clave}:</strong> ${valor}<br/>`;
+                }
+            }
+            contenido += "</div>";
+            layer.bindPopup(contenido);
+        }
+
+        // Popup genérico para el resto de capas (Perímetro y RVN)
+        function popupGenerico(feature, layer) {
+            let contenido = "<div style='font-size:12px; line-height: 1.5;'>";
             if (feature.properties) {
                 for (let clave in feature.properties) {
                     let valor = feature.properties[clave] !== null ? feature.properties[clave] : '-';
@@ -88,46 +143,39 @@
             layer.bindPopup(contenido);
         }
 
-        // 5. Contenedores de capas GeoJSON
-        const capaPerimetro = L.geoJSON(null, { style: estiloPerimetro, onEachFeature: configurarPopup });
-        const capaManzanas = L.geoJSON(null, { style: estiloManzanas, onEachFeature: configurarPopup });
-        const capaRVN = L.geoJSON(null, { style: estiloRVN, onEachFeature: configurarPopup });
-        const capaCovirsur = L.geoJSON(null, { style: estiloCovirsur, onEachFeature: configurarPopup });
-        const capaEjes = L.geoJSON(null, { style: estiloEjesPriorizados, onEachFeature: configurarPopup });
+        // 6. Contenedores de capas GeoJSON con sus respectivos estilos y lógicas
+        const capaPerimetro = L.geoJSON(null, { style: estiloPerimetro, onEachFeature: popupGenerico });
+        const capaRVN = L.geoJSON(null, { style: estiloRVN, onEachFeature: popupGenerico });
+        const capaCovirsur = L.geoJSON(null, { style: estiloCovirsur, onEachFeature: opcionesConcesion });
+        const capaEjes = L.geoJSON(null, { style: obtenerEstiloEjes, onEachFeature: opcionesEjes });
 
-        // 6. Carga de archivos desde la carpeta /datos
+        // 7. Función de carga de archivos desde GitHub
         function cargarGeoJSON(url, capa) {
             fetch(url)
                 .then(response => {
-                    if (!response.ok) {
-                        throw new Error("No se pudo encontrar el archivo: " + url);
-                    }
+                    if (!response.ok) throw new Error("No se encontró: " + url);
                     return response.json();
                 })
                 .then(data => {
                     capa.addData(data);
-                    // Ajustar el mapa al perímetro automáticamente al cargar
-                    if(capa === capaPerimetro) { 
-                        map.fitBounds(capa.getBounds()); 
-                    }
+                    if(capa === capaPerimetro) { map.fitBounds(capa.getBounds()); }
                 })
                 .catch(err => console.error("Error cargando capa:", err));
         }
 
-        // Rutas con tus 5 archivos GeoJSON en GitHub
+        // Llamadas a tus archivos GeoJSON
         cargarGeoJSON('./datos/00_Perim_Intervencion_PMUS-Juliaca.geojson', capaPerimetro);
-        cargarGeoJSON('./datos/00_Manzanas-PDU_PMUS-Juliaca.geojson', capaManzanas);
         cargarGeoJSON('./datos/00_RVN_PMUS-Juliaca.geojson', capaRVN);
         cargarGeoJSON('./datos/00_RVN_Concesionada_COVIRSUR_Juliaca.geojson', capaCovirsur);
         cargarGeoJSON('./datos/00_Ejes_Priorizados_PMUS.geojson', capaEjes);
 
-        // Capas encendidas inmediatamente al entrar a la web
+        // Encender todas las capas disponibles por defecto
         capaPerimetro.addTo(map);
-        capaEjes.addTo(map);
         capaRVN.addTo(map);
         capaCovirsur.addTo(map);
+        capaEjes.addTo(map);
 
-        // 7. Panel de Control de Capas (Encendido/Apagado)
+        // 8. Panel de Control de Capas (Encendido/Apagado)
         const mapasBase = {
             "Mapa Claro": mapaClaro,
             "Vista Satelital": satelital
@@ -137,8 +185,7 @@
             "Ejes Priorizados": capaEjes,
             "RVN Concesionada (COVIRSUR)": capaCovirsur,
             "Red Vial Nacional (RVN)": capaRVN,
-            "Perímetro de Intervención": capaPerimetro,
-            "Manzanas PDU": capaManzanas
+            "Perímetro de Intervención": capaPerimetro
         };
 
         L.control.layers(mapasBase, capasSuperpuestas, { collapsed: false, position: 'topright' }).addTo(map);
