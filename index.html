@@ -1,1 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor Geográfico PMUS Juliaca</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, html { height: 100%; font-family: 'Helvetica Neue', Arial, sans-serif; overflow: hidden; }
+        
+        #map { width: 100%; height: 100%; position: absolute; top: 0; bottom: 0; z-index: 1; }
+        
+        /* Panel de título estilizado */
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            max-width: 320px;
+        }
+        .info-panel h1 { font-size: 16px; color: #333; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .info-panel p { font-size: 12px; color: #666; line-height: 1.3; }
+        
+        /* Ajuste moderno para el control de capas */
+        .leaflet-control-layers {
+            border: none !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+            border-radius: 8px !important;
+            font-size: 13px;
+            padding: 10px !important;
+        }
+    </style>
+</head>
+<body>
 
+    <div class="info-panel">
+        <h1>Visor PMUS Juliaca</h1>
+        <p>Plan de Movilidad Urbana Sostenible: Diagnóstico de Ejes, Manzanas y Perímetro de Intervención.</p>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // 1. Inicializar el mapa centrado en Juliaca
+        const map = L.map('map', {
+            center: [-15.4972, -70.1333],
+            zoom: 13,
+            zoomControl: false
+        });
+        
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // 2. Capas Base
+        const mapaClaro = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        }).addTo(map);
+
+        const satelital = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        });
+
+        // 3. Estilos visuales personalizados para Juliaca
+        const estiloPerimetro = { color: "#2563eb", weight: 3, fillOpacity: 0.05, dashArray: "6, 6" };
+        const estiloManzanas = { color: "#9ca3af", weight: 0.8, fillOpacity: 0.3, fillColor: "#d1d5db" };
+        const estiloRVN = { color: "#4b5563", weight: 2, opacity: 0.8 };
+        const estiloEjesPriorizados = { color: "#dc2626", weight: 5, opacity: 0.9 }; // Rojo grueso resaltado
+
+        // 4. Función para crear los Popups dinámicos con los atributos de la tabla de QGIS
+        function configurarPopup(feature, layer) {
+            let contenido = "<div style='font-size:12px; line-height: 1.5; max-height: 200px; overflow-y: auto;'>";
+            if (feature.properties) {
+                for (let clave in feature.properties) {
+                    // Ocultar valores nulos para limpiar la vista
+                    let valor = feature.properties[clave] !== null ? feature.properties[clave] : '-';
+                    contenido += `<strong>${clave}:</strong> ${valor}<br/>`;
+                }
+            }
+            contenido += "</div>";
+            layer.bindPopup(contenido);
+        }
+
+        // 5. Contenedores de capas GeoJSON
+        const capaPerimetro = L.geoJSON(null, { style: estiloPerimetro, onEachFeature: configurarPopup });
+        const capaManzanas = L.geoJSON(null, { style: estiloManzanas, onEachFeature: configurarPopup });
+        const capaRVN = L.geoJSON(null, { style: estiloRVN, onEachFeature: configurarPopup });
+        const capaEjes = L.geoJSON(null, { style: estiloEjesPriorizados, onEachFeature: configurarPopup });
+
+        // 6. Carga asíncrona apuntando a tus archivos reales en la carpeta /datos
+        function cargarGeoJSON(url, capa) {
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    capa.addData(data);
+                    // Ajustar la vista automáticamente al perímetro de intervención cuando cargue
+                    if(capa === capaPerimetro) { map.fitBounds(capa.getBounds()); }
+                })
+                .catch(err => console.error("Error cargando: " + url, err));
+        }
+
+        // Aquí usamos los nombres exactos de tus archivos
+        cargarGeoJSON('./datos/00_Perim_Intervencion_PMUS-Juliaca.geojson', capaPerimetro);
+        cargarGeoJSON('./datos/00_Manzanas-PDU_PMUS-Juliaca.geojson', capaManzanas);
+        cargarGeoJSON('./datos/00_RVN_PMUS-Juliaca.geojson', capaRVN);
+        cargarGeoJSON('./datos/00_Ejes_Priorizados_PMUS.geojson', capaEjes);
+
+        // Capas encendidas por defecto al entrar a la web
+        capaPerimetro.addTo(map);
+        capaEjes.addTo(map);
+        capaRVN.addTo(map);
+
+        // 7. Control de capas interactivo (Encendido/Apagado)
+        const mapasBase = {
+            "Mapa Claro": mapaClaro,
+            "Vista Satelital": satelital
+        };
+
+        const capasSuperpuestas = {
+            "Ejes Priorizados": capaEjes,
+            "Red Vial Nacional (RVN)": capaRVN,
+            "Perímetro de Intervención": capaPerimetro,
+            "Manzanas PDU": capaManzanas
+        };
+
+        L.control.layers(mapasBase, capasSuperpuestas, { collapsed: false, position: 'topright' }).addTo(map);
+
+    </script>
+</body>
+</html>
