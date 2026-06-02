@@ -28,7 +28,7 @@
         .info-panel h1 { font-size: 16px; color: #333; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
         .info-panel p { font-size: 12px; color: #666; line-height: 1.3; }
         
-        /* Ajuste moderno para el control de capas */
+        /* Estilos para el Control de Capas superior derecho */
         .leaflet-control-layers {
             border: none !important;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
@@ -36,13 +36,49 @@
             font-size: 13px;
             padding: 10px !important;
         }
+
+        /* DISEÑO DE LA LEYENDA FIJA (Inferior Izquierda) */
+        .legend {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            font-size: 12px;
+            color: #333;
+            line-height: 22px;
+            max-width: 240px;
+        }
+        .legend h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 4px;
+            color: #222;
+        }
+        .legend i {
+            width: 18px;
+            height: 12px;
+            float: left;
+            margin-right: 8px;
+            margin-top: 5px;
+            opacity: 0.85;
+            border-radius: 2px;
+        }
+        /* Ajuste específico para la línea discontinua del perímetro en leyenda */
+        .legend i.linea-discontinua {
+            border-top: 3px dashed #000000;
+            background: transparent !important;
+            height: 0;
+            margin-top: 9px;
+        }
     </style>
 </head>
 <body>
 
     <div class="info-panel">
-        <h1>Visor PMUS Juliaca</h1>
-        <p>Plan de Movilidad Urbana Sostenible: Ejes Priorizados, Red Vial Nacional y Concesiones.</p>
+        <h1>Visor Diagnóstico PMUS Juliaca</h1>
+        <p>Plan de Movilidad Urbana Sostenible (PMUS): Ejes Priorizados, Red Vial Nacional y Concesiones.</p>
     </div>
 
     <div id="map"></div>
@@ -68,37 +104,32 @@
             attribution: 'Tiles &copy; Esri'
         });
 
-        // 3. Estilos Base Estáticos
-        const estiloPerimetro = { color: "#000000", weight: 3, fillOpacity: 0.02, dashArray: "5, 5" }; // Negro
-        const estiloRVN = { color: "#dc2626", weight: 2.5, opacity: 0.85 }; // Rojo
-        const estiloCovirsur = { color: "#8b5cf6", weight: 4, opacity: 0.4, fillOpacity: 0.2 }; // Morado claro con transparencia
+        // 3. Estilos Base Estáticos (EDITA AQUÍ COLORES Y GROSORES GENERALES)
+        const estiloPerimetro = { color: "#000000", weight: 3.5, fillOpacity: 0.02, dashArray: "5, 5" }; 
+        const estiloRVN = { color: "#dc2626", weight: 2.5, opacity: 0.85 }; 
+        const estiloCovirsur = { color: "#8b5cf6", weight: 8, opacity: 0.4, fillOpacity: 0.2 }; 
 
-        // 4. Estilo Dinámico para Ejes Priorizados según ID
+        // 4. Estilo Dinámico para Ejes Priorizados según ID (EDITA AQUÍ COLORES DE EJES)
         function obtenerEstiloEjes(feature) {
             let id = feature.properties.id;
-            let colorEje = "#6b7280"; // Color gris por defecto si no coincide el ID
+            let colorEje = "#6b7280"; 
             
-            if (id == 1) colorEje = "#4ade80";      // Verde claro
-            else if (id == 2) colorEje = "#fb923c"; // Naranja claro
-            else if (id == 3) colorEje = "#60a5fa"; // Azul claro
+            if (id == 1) colorEje = "#4ade80";      // ID 1: Verde claro
+            else if (id == 2) colorEje = "#fb923c"; // ID 2: Naranja claro
+            else if (id == 3) colorEje = "#60a5fa"; // ID 3: Azul claro
 
             return {
                 color: colorEje,
-                weight: 6, // Grosor resaltado para los ejes
+                weight: 12, // Grosor de las líneas de los ejes
                 opacity: 0.9
             };
         }
 
-        // 5. Lógica de Interacción (Hover y Popups específicos)
-        
-        // Configuración para los Ejes Priorizados
+        // 5. Lógica de Interacción (Hover Tooltips y Popups)
         function opcionesEjes(feature, layer) {
-            // Mostrar nombre del eje al pasar el mouse por encima (Tooltip)
             if (feature.properties && feature.properties.nomb_eje) {
-                layer.bindTooltip(feature.properties.nomb_eje, { sticky: true, className: 'label-eje' });
+                layer.bindTooltip(feature.properties.nomb_eje, { sticky: true });
             }
-            
-            // Popup clásico al hacer clic con toda la info de la tabla de atributos
             let contenido = "<div style='font-size:12px; line-height: 1.5;'>";
             for (let clave in feature.properties) {
                 let valor = feature.properties[clave] !== null ? feature.properties[clave] : '-';
@@ -108,15 +139,11 @@
             layer.bindPopup(contenido);
         }
 
-        // Configuración para la Concesión (COVIRSUR)
         function opcionesConcesion(feature, layer) {
-            // Mostrar "Concesionaria: [valor]" al pasar el mouse por encima
             if (feature.properties && feature.properties.ADM_VALIDO) {
                 let textoHover = `<strong>Concesionaria:</strong> ${feature.properties.ADM_VALIDO}`;
                 layer.bindTooltip(textoHover, { sticky: true, html: true });
             }
-
-            // Popup al hacer clic
             let contenido = "<div style='font-size:12px; line-height: 1.5;'>";
             for (let clave in feature.properties) {
                 let valor = feature.properties[clave] !== null ? feature.properties[clave] : '-';
@@ -130,7 +157,6 @@
             layer.bindPopup(contenido);
         }
 
-        // Popup genérico para el resto de capas (Perímetro y RVN)
         function popupGenerico(feature, layer) {
             let contenido = "<div style='font-size:12px; line-height: 1.5;'>";
             if (feature.properties) {
@@ -143,13 +169,13 @@
             layer.bindPopup(contenido);
         }
 
-        // 6. Contenedores de capas GeoJSON con sus respectivos estilos y lógicas
+        // 6. Contenedores de capas GeoJSON
         const capaPerimetro = L.geoJSON(null, { style: estiloPerimetro, onEachFeature: popupGenerico });
         const capaRVN = L.geoJSON(null, { style: estiloRVN, onEachFeature: popupGenerico });
         const capaCovirsur = L.geoJSON(null, { style: estiloCovirsur, onEachFeature: opcionesConcesion });
         const capaEjes = L.geoJSON(null, { style: obtenerEstiloEjes, onEachFeature: opcionesEjes });
 
-        // 7. Función de carga de archivos desde GitHub
+        // 7. Carga de archivos desde la carpeta /datos
         function cargarGeoJSON(url, capa) {
             fetch(url)
                 .then(response => {
@@ -163,19 +189,17 @@
                 .catch(err => console.error("Error cargando capa:", err));
         }
 
-        // Llamadas a tus archivos GeoJSON
         cargarGeoJSON('./datos/00_Perim_Intervencion_PMUS-Juliaca.geojson', capaPerimetro);
         cargarGeoJSON('./datos/00_RVN_PMUS-Juliaca.geojson', capaRVN);
         cargarGeoJSON('./datos/00_RVN_Concesionada_COVIRSUR_Juliaca.geojson', capaCovirsur);
         cargarGeoJSON('./datos/00_Ejes_Priorizados_PMUS.geojson', capaEjes);
 
-        // Encender todas las capas disponibles por defecto
         capaPerimetro.addTo(map);
         capaRVN.addTo(map);
         capaCovirsur.addTo(map);
         capaEjes.addTo(map);
 
-        // 8. Panel de Control de Capas (Encendido/Apagado)
+        // 8. Panel de Control de Capas Superior Derecho (EDITA AQUÍ LOS NOMBRES QUE SE MUESTRAN)
         const mapasBase = {
             "Mapa Claro": mapaClaro,
             "Vista Satelital": satelital
@@ -183,12 +207,32 @@
 
         const capasSuperpuestas = {
             "Ejes Priorizados": capaEjes,
-            "RVN Concesionada (COVIRSUR)": capaCovirsur,
+            "Concesión (COVISUR)": capaCovirsur,
             "Red Vial Nacional (RVN)": capaRVN,
             "Perímetro de Intervención": capaPerimetro
         };
 
         L.control.layers(mapasBase, capasSuperpuestas, { collapsed: false, position: 'topright' }).addTo(map);
+
+        // 9. CONSTRUCCIÓN DE LA LEYENDA FIJA (Inferior Izquierda)
+        const leyenda = L.control({ position: 'bottomleft' });
+
+        leyenda.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = `
+                <h4>Leyenda</h4>
+                <i class="linea-discontinua"></i> Perímetro Intervención<br>
+                <i style="background: #dc2626; height: 3px; margin-top: 9px;"></i> Red Vial Nacional<br>
+                <i style="background: #8b5cf6; opacity: 0.4;"></i> Concesión COVIRSUR<br>
+                <h4 style="margin-top: 10px; border-bottom: none; font-size: 11px;">Ejes Priorizados:</h4>
+                <i style="background: #4ade80; height: 5px; margin-top: 8px;"></i> Eje ID 1 (Verde)<br>
+                <i style="background: #fb923c; height: 5px; margin-top: 8px;"></i> Eje ID 2 (Naranja)<br>
+                <i style="background: #60a5fa; height: 5px; margin-top: 8px;"></i> Eje ID 3 (Azul)<br>
+            `;
+            return div;
+        };
+
+        leyenda.addTo(map);
 
     </script>
 </body>
