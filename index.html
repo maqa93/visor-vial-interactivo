@@ -28,7 +28,7 @@
         .info-panel h1 { font-size: 16px; color: #333; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
         .info-panel p { font-size: 12px; color: #666; line-height: 1.3; margin-bottom: 12px; }
         
-        /* Selector de ciudades estilizado */
+        /* Selector de ciudades */
         .selector-ciudad {
             width: 100%;
             padding: 8px 12px;
@@ -40,9 +40,32 @@
             border-radius: 6px;
             cursor: pointer;
             outline: none;
+            margin-bottom: 10px;
         }
         .selector-ciudad:hover { background-color: #dbeafe; }
         
+        /* HERRAMIENTA EN VIVO: Botón de subida de archivos */
+        .btn-cargar-contenedor {
+            position: relative;
+            width: 100%;
+            text-align: center;
+        }
+        .btn-cargar-label {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #ffffff;
+            background-color: #059669;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-cargar-label:hover { background-color: #047857; }
+        .file-input { display: none; } /* Ocultar el input feo por defecto de Windows */
+
         /* Control de Capas superior derecho */
         .leaflet-control-layers {
             border: none !important;
@@ -95,11 +118,17 @@
     <div class="info-panel">
         <h1>Visor Diagnóstico PMUS</h1>
         <p>Plan de Movilidad Urbana Sostenible (PMUS): Ejes Priorizados, Red Vial Nacional y Concesiones.<br><strong>Ciudades: Chiclayo - Huancayo - Juliaca</strong></p>
+        
         <select id="ciudadSelect" class="selector-ciudad" onchange="cambiarCiudad(this.value)">
             <option value="juliaca">Juliaca</option>
             <option value="chiclayo">Chiclayo</option>
             <option value="huancayo">Huancayo</option>
         </select>
+
+        <div class="btn-cargar-contenedor">
+            <label for="fileInput" class="btn-cargar-label">📁 Cargar Ejes en Vivo (.geojson)</label>
+            <input type="file" id="fileInput" class="file-input" accept=".geojson" onchange="cargarGeojsonEnVivo(event)" />
+        </div>
     </div>
 
     <div id="map"></div>
@@ -107,7 +136,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <script>
-        // 1. Inicializar el mapa centrado de forma general en Perú
+        // 1. Inicializar el mapa
         const map = L.map('map', {
             center: [-9.19, -75.01],
             zoom: 6,
@@ -122,26 +151,27 @@
         const googleCalles = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { attribution: '&copy; Google Maps' });
         const satelital = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
 
-        // 3. Estilos Estáticos Base (RESPETANDO TUS AJUSTES)
+        // 3. Estilos Estáticos Base
         const estiloPerimetro = { color: "#000000", weight: 3.5, fillOpacity: 0.02, dashArray: "5, 5" }; 
         const estiloRVN = { color: "#dc2626", weight: 2.5, opacity: 0.85 }; 
-        const estiloConcesion = { color: "#8b5cf6", weight: 10, opacity: 0.7, fillOpacity: 0.2 }; // Grosor 10 y Opacidad 0.7 respetados
+        const estiloConcesion = { color: "#8b5cf6", weight: 10, opacity: 0.7, fillOpacity: 0.2 }; 
 
-        // Diccionario para almacenar la paleta indexada por nombre
+        // Diccionarios globales para el control dinámico de estilos
         let coloresEjesAsignados = {};
-        let mapeoManualJuliaca = {}; // Para forzar nombres limpios en la leyenda de Juliaca
+        let mapeoManualJuliaca = {}; 
+        let ciudadActual = 'juliaca';
 
         // Generador dinámico de colores estéticos manteniendo tus grosores
         function obtenerColorPorNombre(nombre, id) {
-            // Forzar consistencia con tus colores de Juliaca si existe ID numérico
-            if (id == 1) return "#4ade80";
-            if (id == 2) return "#fb923c";
-            if (id == 3) return "#60a5fa";
+            if (ciudadActual === 'juliaca') {
+                if (id == 1) return "#4ade80";
+                if (id == 2) return "#fb923c";
+                if (id == 3) return "#60a5fa";
+            }
 
             if (!nombre) return "#6b7280";
             if (coloresEjesAsignados[nombre]) return coloresEjesAsignados[nombre];
             
-            // Paleta de colores contrastantes para los ejes de Chiclayo y Huancayo (hasta 10 ejes)
             const paleta = ["#4ade80", "#fb923c", "#60a5fa", "#f43f5e", "#06b6d4", "#a855f7", "#eab308", "#10b981", "#ec4899", "#14b8a6"];
             let indice = Object.keys(coloresEjesAsignados).length % paleta.length;
             coloresEjesAsignados[nombre] = paleta[indice];
@@ -153,19 +183,17 @@
             let id = feature.properties.id;
             return {
                 color: obtenerColorPorNombre(nombre, id),
-                weight: 16, // Tu grosor de 16 respetado
-                opacity: 0.6 // Tu opacidad de 0.6 respetada
+                weight: 16, 
+                opacity: 0.6 
             };
         }
 
-        // 4. Lógicas de Herramientas Emergentes e Interacciones
+        // 4. Lógicas de Popups e Interacciones
         function opcionesEjes(feature, layer) {
             if (feature.properties && feature.properties.nomb_eje) {
                 layer.bindTooltip(feature.properties.nomb_eje, { sticky: true });
-                
-                // Si estamos en Juliaca, registramos la relación ID -> Nombre real para armar la leyenda limpia automáticamente
                 let id = feature.properties.id;
-                if (id == 1 || id == 2 || id == 3) {
+                if (ciudadActual === 'juliaca' && (id == 1 || id == 2 || id == 3)) {
                     mapeoManualJuliaca[id] = feature.properties.nomb_eje;
                 }
             }
@@ -208,7 +236,7 @@
         let capaConcesion = L.geoJSON(null, { style: estiloConcesion, onEachFeature: opcionesConcesion }).addTo(map);
         let capaEjes = L.geoJSON(null, { style: obtenerEstiloEjes, onEachFeature: opcionesEjes }).addTo(map);
 
-        // 6. Diccionario de Rutas de Archivos en tu Servidor GitHub
+        // 6. Diccionario de Rutas de Archivos del Servidor
         const configuracionCiudades = {
             juliaca: {
                 nombreConcesion: "Concesión COVISUR",
@@ -233,51 +261,86 @@
             }
         };
 
-        // 7. Cambiar de Ciudad dinámicamente sin recargar la página
+        // 7. Cambiar de Ciudad dinámicamente
         function cambiarCiudad(ciudadKey) {
+            ciudadActual = ciudadKey;
             capaPerimetro.clearLayers();
             capaRVN.clearLayers();
             capaConcesion.clearLayers();
             capaEjes.clearLayers();
             coloresEjesAsignados = {}; 
-            // Conservamos el mapeo de Juliaca para la leyenda estática limpia si aplica
+            document.getElementById('fileInput').value = ""; // Limpiar el input de archivos
 
             const dataCiudad = configuracionCiudades[ciudadKey];
 
-            // Cargar Perímetro primero para calcular extensión y encuadrar la cámara
+            // Cargar Perímetro de la base de datos de GitHub
             fetch(dataCiudad.perimetro)
                 .then(r => r.json()).then(data => {
                     capaPerimetro.addData(data);
                     map.fitBounds(capaPerimetro.getBounds());
-                }).catch(e => console.error("Error cargando perímetro:", e));
+                }).catch(e => console.error("Error Perímetro:", e));
 
-            // Carga paralela de Red Vial y Concesión
             fetch(dataCiudad.rvn).then(r => r.json()).then(data => capaRVN.addData(data));
             fetch(dataCiudad.concesion).then(r => r.json()).then(data => capaConcesion.addData(data));
             
-            // Cargar Ejes Priorizados y procesar su leyenda
             fetch(dataCiudad.ejes)
                 .then(r => r.json())
                 .then(data => {
                     capaEjes.addData(data);
-                    construirLeyenda(ciudadKey, dataCiudad.nombreConcesion);
+                    construirLeyenda(dataCiudad.nombreConcesion);
                 }).catch(e => {
-                    console.error("No se encontraron ejes para esta ciudad aún:", e);
-                    construirLeyenda(ciudadKey, dataCiudad.nombreConcesion);
+                    console.log("Esta ciudad aún no cuenta con un archivo de ejes en el servidor. Puede cargarse en vivo.");
+                    construirLeyenda(dataCiudad.nombreConcesion);
                 });
         }
 
-        // 8. Menú Desplegable de Capas Base e Interruptores
+        // ==========================================
+        // TOOL EN VIVO: FUNCIÓN PARA LEER ARCHIVO LOCAL
+        // ==========================================
+        function cargarGeojsonEnVivo(event) {
+            const archivo = event.target.files[0];
+            if (!archivo) return;
+
+            const lector = new FileReader();
+            lector.onload = function(e) {
+                try {
+                    const datosGeoJSON = JSON.parse(e.target.result);
+                    
+                    // Limpiar ejes anteriores antes de inyectar el nuevo
+                    capaEjes.clearLayers();
+                    coloresEjesAsignados = {}; 
+
+                    // Inyectar la capa leída en vivo al contenedor de Leaflet
+                    capaEjes.addData(datosGeoJSON);
+                    
+                    // Hacer zoom inmediato hacia el archivo que acabamos de cargar
+                    if (capaEjes.getLayers().length > 0) {
+                        map.fitBounds(capaEjes.getBounds());
+                    }
+
+                    // Forzar actualización de la leyenda con los nuevos nombres del archivo local
+                    const concesionTexto = configuracionCiudades[ciudadActual].nombreConcesion;
+                    construirLeyenda(concesionTexto);
+
+                } catch (error) {
+                    alert("Error: El archivo seleccionado no tiene un formato GeoJSON válido.");
+                    console.error(error);
+                }
+            };
+            lector.readAsText(archivo);
+        }
+
+        // 8. Panel de Control de Capas Superior Derecho
         const mapasBase = { "Mapa Claro Gris": mapaClaro, "OpenStreetMap": osmEstandar, "Google Maps": googleCalles, "Vista Satelital": satelital };
         const capasSuperpuestas = { "Ejes Priorizados": capaEjes, "RVN Concesionada": capaConcesion, "Red Vial Nacional (RVN)": capaRVN, "Perímetro de Intervención": capaPerimetro };
         L.control.layers(mapasBase, capasSuperpuestas, { collapsed: false, position: 'topright' }).addTo(map);
 
-        // 9. LEYENDA FIJA INTELIGENTE
+        // 9. LEYENDA FIJA ADAPTATIVA
         const leyenda = L.control({ position: 'bottomleft' });
         leyenda.onAdd = function () { return L.DomUtil.create('div', 'legend'); };
         leyenda.addTo(map);
 
-        function construirLeyenda(ciudadKey, nombreConcesion) {
+        function construirLeyenda(nombreConcesion) {
             const div = document.querySelector('.legend');
             let html = `
                 <h4>Leyenda</h4>
@@ -287,27 +350,25 @@
                 <h4 style="margin-top: 10px; border-bottom: none; font-size: 11px;">Ejes Prioritarios:</h4>
             `;
 
-            if (ciudadKey === 'juliaca') {
-                // Forzar tus textos e identificadores exactos para Juliaca
+            if (ciudadActual === 'juliaca' && Object.keys(coloresEjesAsignados).length <= 3 && mapeoManualJuliaca[1]) {
                 html += `
                     <i style="background: #4ade80; height: 5px; margin-top: 8px;"></i> ${mapeoManualJuliaca[1] || "Independencia - Mariano Núñez"}<br>
                     <i style="background: #fb923c; height: 5px; margin-top: 8px;"></i> ${mapeoManualJuliaca[2] || "Huancané - Jr. San Martín"}<br>
                     <i style="background: #60a5fa; height: 5px; margin-top: 8px;"></i> ${mapeoManualJuliaca[3] || "Circunvalación"}<br>
                 `;
             } else {
-                // Autogeneración para Chiclayo y Huancayo (Lee dinámicamente la tabla de atributos)
                 if (Object.keys(coloresEjesAsignados).length > 0) {
                     for (let nombreEje in coloresEjesAsignados) {
                         html += `<i style="background: ${coloresEjesAsignados[nombreEje]}; height: 5px; margin-top: 8px;"></i> ${nombreEje}<br>`;
                     }
                 } else {
-                    html += `<span style="color:#888; font-style:italic; padding-left:5px;">Sin ejes definidos</span><br>`;
+                    html += `<span style="color:#888; font-style:italic; padding-left:5px;">Sin ejes (Cargue un archivo)</span><br>`;
                 }
             }
             div.innerHTML = html;
         }
 
-        // Carga inicial por defecto instalando Juliaca
+        // Carga inicial automatizada
         cambiarCiudad('juliaca');
 
     </script>
